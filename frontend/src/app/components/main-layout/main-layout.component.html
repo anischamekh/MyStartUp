@@ -1,0 +1,224 @@
+@if (layout.isMobile() && layout.mobileDrawerOpen()) {
+  <div class="app-backdrop lg:hidden" (click)="layout.closeMobileDrawer()" aria-hidden="true"></div>
+}
+
+<p-toast position="top-right" />
+
+<div class="app-shell">
+  <aside
+    class="app-sidebar"
+    [class.app-sidebar--open]="layout.isMobile() && layout.mobileDrawerOpen()"
+    [class.app-sidebar--collapsed]="!layout.isMobile() && !layout.sidebarExpanded()"
+  >
+    <div class="app-sidebar__brand">
+      <span class="text-lg">MyStartUp</span>
+    </div>
+
+    <nav class="app-sidebar__nav">
+      <a
+        routerLink="/dashboard"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="app-sidebar__link"
+        (click)="layout.closeMobileDrawer()"
+      >
+        <i class="pi pi-th-large"></i>
+        <span class="app-sidebar__text">Dashboard</span>
+      </a>
+
+      @if (showNavLink(['EMPLOYEE', 'TEAM_LEADER', 'ADMIN'])) {
+        <a
+          routerLink="/tasks"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-check-square"></i>
+          <span class="app-sidebar__text">Tasks</span>
+        </a>
+      }
+
+      @if (showNavLink(['MANAGER', 'ADMIN'])) {
+        <a
+          routerLink="/projects"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-folder-open"></i>
+          <span class="app-sidebar__text">Projects</span>
+        </a>
+      }
+
+      @if (showNavLink(['HR', 'ADMIN'])) {
+        <a
+          routerLink="/teams"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-sitemap"></i>
+          <span class="app-sidebar__text">Teams</span>
+        </a>
+      }
+
+      @if (showNavLink(['HR', 'ADMIN'])) {
+        <a
+          routerLink="/employees"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-users"></i>
+          <span class="app-sidebar__text">Employees</span>
+        </a>
+      }
+
+      @if (showNavLink(['EMPLOYEE', 'TEAM_LEADER', 'MANAGER', 'HR', 'ADMIN'])) {
+        <a
+          routerLink="/leaves"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-calendar"></i>
+          <span class="app-sidebar__text">Leaves</span>
+        </a>
+      }
+
+      <a
+        routerLink="/documents"
+        routerLinkActive="active"
+        class="app-sidebar__link"
+        (click)="layout.closeMobileDrawer()"
+      >
+        <i class="pi pi-file"></i>
+        <span class="app-sidebar__text">Documents</span>
+      </a>
+
+      @if (showNavLink(['HR', 'EMPLOYEE', 'ADMIN'])) {
+        <a
+          routerLink="/payroll"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-wallet"></i>
+          <span class="app-sidebar__text">Payroll</span>
+        </a>
+      }
+
+      @if (showNavLink(['MANAGER', 'ADMIN'])) {
+        <a
+          routerLink="/reports"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-chart-bar"></i>
+          <span class="app-sidebar__text">Reports</span>
+        </a>
+      }
+
+      @if (showNavLink(['TEAM_LEADER', 'HR', 'MANAGER', 'ADMIN'])) {
+        <a
+          routerLink="/evaluations"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-star"></i>
+          <span class="app-sidebar__text">Evaluations</span>
+        </a>
+      }
+
+      @if (showNavLink(['HR', 'MANAGER', 'ADMIN'])) {
+        <a
+          routerLink="/leave-calendar"
+          routerLinkActive="active"
+          class="app-sidebar__link"
+          (click)="layout.closeMobileDrawer()"
+        >
+          <i class="pi pi-calendar-plus"></i>
+          <span class="app-sidebar__text">Leave calendar</span>
+        </a>
+      }
+
+      <a
+        routerLink="/skills-training"
+        routerLinkActive="active"
+        class="app-sidebar__link"
+        (click)="layout.closeMobileDrawer()"
+      >
+        <i class="pi pi-book"></i>
+        <span class="app-sidebar__text">Skills &amp; training</span>
+      </a>
+    </nav>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-topbar">
+      <div class="topbar-left">
+        @if (layout.isMobile()) {
+          <p-button
+            type="button"
+            icon="pi pi-bars"
+            [rounded]="true"
+            [text]="true"
+            (onClick)="toggleSidebar()"
+            aria-label="Open menu"
+          />
+        } @else {
+          <p-button
+            type="button"
+            [icon]="layout.sidebarExpanded() ? 'pi pi-angle-double-left' : 'pi pi-angle-double-right'"
+            [rounded]="true"
+            [text]="true"
+            (onClick)="toggleSidebar()"
+            aria-label="Toggle sidebar"
+          />
+        }
+        <span class="title-text">{{ pageTitle }}</span>
+      </div>
+
+      <div class="topbar-right">
+        <p-button
+          type="button"
+          [icon]="theme.dark() ? 'pi pi-sun' : 'pi pi-moon'"
+          [rounded]="true"
+          [text]="true"
+          (onClick)="theme.toggle()"
+          [attr.aria-label]="theme.dark() ? 'Switch to light mode' : 'Switch to dark mode'"
+        />
+        <p-button
+          type="button"
+          icon="pi pi-bell"
+          [rounded]="true"
+          [text]="true"
+          (onClick)="goNotifications()"
+          [badge]="badge.unreadCount() > 0 ? badge.unreadCount().toString() : undefined"
+          badgeSeverity="danger"
+          aria-label="Notifications"
+        />
+
+        <span class="user-name">
+          {{ (auth.auth$ | async)?.fullName }}
+        </span>
+
+        <p-button
+          type="button"
+          label="Logout"
+          icon="pi pi-sign-out"
+          severity="danger"
+          (onClick)="logout()"
+        />
+      </div>
+    </header>
+
+    <main class="app-content">
+      <div class="app-content__inner">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+</div>
