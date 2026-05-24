@@ -10,4 +10,6 @@ public interface TrainingAttendanceRepository extends JpaRepository<TrainingAtte
     List<TrainingAttendance> findByTraining_IdOrderByIdAsc(Long trainingId);
 
     Optional<TrainingAttendance> findByTraining_IdAndUser_Id(Long trainingId, Long userId);
+
+    void deleteByUser_Id(Long userId);
 }

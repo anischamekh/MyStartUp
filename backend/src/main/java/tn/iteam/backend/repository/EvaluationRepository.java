@@ -8,4 +8,8 @@ public interface EvaluationRepository extends JpaRepository<Evaluation, Long> {
     List<Evaluation> findByEmployee_Id(Long employeeId);
 
     List<Evaluation> findByEvaluator_Id(Long evaluatorId);
+
+    void deleteByEmployee_Id(Long employeeId);
+
+    void deleteByEvaluator_Id(Long evaluatorId);
 }

@@ -9,6 +9,8 @@ import tn.iteam.backend.entity.Task;
 
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByAssignedToId(Long userId);
+
+    boolean existsByAssignedTo_IdAndStatusIn(Long userId, List<tn.iteam.backend.entity.TaskStatus> statuses);
     List<Task> findByCreatedById(Long userId);
     List<Task> findByProjectId(Long projectId);
 

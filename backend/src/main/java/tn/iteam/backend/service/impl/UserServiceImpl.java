@@ -10,17 +10,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tn.iteam.backend.dto.CreateUserRequest;
+import tn.iteam.backend.dto.EmployeeProfilePayload;
+import tn.iteam.backend.dto.UpdateUserRequest;
+import tn.iteam.backend.dto.UserResponse;
 import tn.iteam.backend.entity.EmployeeDocument;
 import tn.iteam.backend.entity.EmployeeProfile;
 import tn.iteam.backend.entity.Project;
 import tn.iteam.backend.entity.Role;
 import tn.iteam.backend.entity.RoleName;
+import tn.iteam.backend.entity.TaskStatus;
 import tn.iteam.backend.entity.Team;
 import tn.iteam.backend.entity.User;
 import tn.iteam.backend.exception.BusinessException;
 import tn.iteam.backend.repository.EmployeeDocumentRepository;
 import tn.iteam.backend.repository.EmployeeProfileRepository;
 import tn.iteam.backend.repository.EmployeeSkillRepository;
+import tn.iteam.backend.repository.EvaluationRepository;
 import tn.iteam.backend.repository.LeaveRequestRepository;
 import tn.iteam.backend.repository.NotificationRepository;
 import tn.iteam.backend.repository.PayrollRepository;
@@ -28,9 +34,10 @@ import tn.iteam.backend.repository.ProjectRepository;
 import tn.iteam.backend.repository.RoleRepository;
 import tn.iteam.backend.repository.TaskRepository;
 import tn.iteam.backend.repository.TeamRepository;
+import tn.iteam.backend.repository.TrainingAttendanceRepository;
 import tn.iteam.backend.repository.UserRepository;
-import tn.iteam.backend.service.email.EmailService;
 import tn.iteam.backend.service.UserService;
+import tn.iteam.backend.service.email.EmailService;
 
 @Service
 @Transactional
@@ -52,6 +59,8 @@ public class UserServiceImpl implements UserService {
     private final EmployeeDocumentRepository employeeDocumentRepository;
     private final EmployeeSkillRepository employeeSkillRepository;
     private final PayrollRepository payrollRepository;
+    private final EvaluationRepository evaluationRepository;
+    private final TrainingAttendanceRepository trainingAttendanceRepository;
 
     public UserServiceImpl(
             UserRepository userRepository,
@@ -67,7 +76,9 @@ public class UserServiceImpl implements UserService {
             ProjectRepository projectRepository,
             EmployeeDocumentRepository employeeDocumentRepository,
             EmployeeSkillRepository employeeSkillRepository,
-            PayrollRepository payrollRepository
+            PayrollRepository payrollRepository,
+            EvaluationRepository evaluationRepository,
+            TrainingAttendanceRepository trainingAttendanceRepository
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -83,6 +94,8 @@ public class UserServiceImpl implements UserService {
         this.employeeDocumentRepository = employeeDocumentRepository;
         this.employeeSkillRepository = employeeSkillRepository;
         this.payrollRepository = payrollRepository;
+        this.evaluationRepository = evaluationRepository;
+        this.trainingAttendanceRepository = trainingAttendanceRepository;
     }
 
     @Override
@@ -96,102 +109,83 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User create(User user) {
-        String rawPassword = user.getPassword();
-        if (user.getId() != null) {
-            user.setId(null);
-        }
-        if (userRepository.existsByUsername(user.getUsername())) {
+    public UserResponse create(CreateUserRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new BusinessException("Username already exists");
         }
-        if (userRepository.existsByEmail(user.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already exists");
         }
 
         User creator = currentUserProvider.requireCurrentUser();
         boolean hrFlow = creator.getRole() != null && creator.getRole().getName() == RoleName.HR;
 
-        if (user.getRole() == null || user.getRole().getName() == null) {
-            Role role = roleRepository
-                    .findByName(RoleName.EMPLOYEE)
-                    .orElseThrow(() -> new BusinessException("Role EMPLOYEE not found"));
-            user.setRole(role);
-        } else {
-            RoleName name = user.getRole().getName();
-            Role role = roleRepository
-                    .findByName(name)
-                    .orElseThrow(() -> new BusinessException("Role not found: " + name));
-            user.setRole(role);
+        RoleName roleName = request.getRole() != null ? request.getRole() : RoleName.EMPLOYEE;
+        Role role = roleRepository
+                .findByName(roleName)
+                .orElseThrow(() -> new BusinessException("Role not found: " + roleName));
+
+        Team team = null;
+        if (roleName != RoleName.ADMIN) {
+            Long teamId = request.resolveTeamId();
+            if (hrFlow && teamId == null) {
+                throw new BusinessException("Please select a team");
+            }
+            if (teamId != null) {
+                team = teamRepository.findById(teamId).orElseThrow(() -> new BusinessException("Team not found"));
+            }
         }
 
-        Team requiredTeam = null;
-        if (hrFlow && user.getRole().getName() != RoleName.ADMIN) {
-            requiredTeam = resolveRequiredTeamForHr(user);
-        }
-
+        String rawPassword = request.getPassword();
+        User user = new User();
+        user.setUsername(request.getUsername().trim());
+        user.setFullName(request.getFullName().trim());
+        user.setEmail(request.getEmail().trim());
         user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setRole(role);
+
         User saved = userRepository.save(user);
 
-        if (saved.getRole() != null && saved.getRole().getName() != RoleName.ADMIN) {
-            EmployeeProfile profile = new EmployeeProfile();
+        EmployeeProfile profile = null;
+        if (roleName != RoleName.ADMIN) {
+            profile = new EmployeeProfile();
             profile.setUser(saved);
             profile.setRemainingLeaveDays(30);
-            copyProfileFieldsFromRequest(profile, user.getEmployeeProfile());
-            if (hrFlow) {
-                profile.setTeam(requiredTeam);
-            } else if (user.getEmployeeProfile() != null && user.getEmployeeProfile().getTeam() != null) {
-                Long tid = user.getEmployeeProfile().getTeam().getId();
-                if (tid != null) {
-                    Team t = teamRepository.findById(tid).orElseThrow(() -> new BusinessException("Team not found"));
-                    profile.setTeam(t);
-                }
+            if (request.getEmployeeProfile() != null) {
+                request.getEmployeeProfile().applyTo(profile);
             }
-            employeeProfileRepository.save(profile);
+            profile.setTeam(team);
+            profile = employeeProfileRepository.save(profile);
+            saved.setEmployeeProfile(profile);
         }
 
-        try {
-            if (creator.getRole() != null && creator.getRole().getName() == RoleName.HR) {
-                String subject = "Welcome to the Company";
-                String body = ""
-                        + "Hello,\n\n"
-                        + "Your account has been created successfully.\n\n"
-                        + "Username: " + saved.getUsername() + "\n"
-                        + "Password: " + rawPassword + "\n\n"
-                        + "You can login here:\n"
-                        + "http://localhost:4200/login\n\n"
-                        + "Welcome to the team!\n";
+        sendWelcomeEmailIfHr(creator, saved, rawPassword);
 
-                emailService.sendEmail(saved.getEmail(), subject, body);
-            }
-        } catch (Exception e) {
-            log.error("Welcome email failed for createdUserId={} createdUserEmail={}", saved.getId(), saved.getEmail(), e);
-        }
-
-        return saved;
+        return UserResponse.from(saved, profile);
     }
 
     @Override
-    public User update(Long id, User user) {
+    public UserResponse update(Long id, UpdateUserRequest request) {
         User existing = findById(id);
-        existing.setFullName(user.getFullName());
-        existing.setEmail(user.getEmail());
-        existing.setUsername(user.getUsername());
+        existing.setFullName(request.getFullName().trim());
+        existing.setEmail(request.getEmail().trim());
+        existing.setUsername(request.getUsername().trim());
 
-        if (user.getPassword() != null && !user.getPassword().isBlank()) {
-            existing.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            existing.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
-        if (user.getRole() != null && user.getRole().getName() != null) {
-            Role role = roleRepository
-                    .findByName(user.getRole().getName())
-                    .orElseThrow(() -> new BusinessException("Role not found: " + user.getRole().getName()));
-            existing.setRole(role);
-        }
+        RoleName roleName = request.getRole();
+        Role role = roleRepository
+                .findByName(roleName)
+                .orElseThrow(() -> new BusinessException("Role not found: " + roleName));
+        existing.setRole(role);
 
         User saved = userRepository.save(existing);
 
-        if (saved.getRole() != null && saved.getRole().getName() != RoleName.ADMIN) {
-            EmployeeProfile profile = employeeProfileRepository
+        EmployeeProfile profile = null;
+        if (roleName != RoleName.ADMIN) {
+            profile = employeeProfileRepository
                     .findByUserId(saved.getId())
                     .orElseGet(() -> {
                         EmployeeProfile ep = new EmployeeProfile();
@@ -199,18 +193,25 @@ public class UserServiceImpl implements UserService {
                         ep.setRemainingLeaveDays(30);
                         return ep;
                     });
-            copyProfileFieldsFromRequest(profile, user.getEmployeeProfile());
-            if (user.getEmployeeProfile() != null && user.getEmployeeProfile().getTeam() != null) {
-                Long tid = user.getEmployeeProfile().getTeam().getId();
-                if (tid != null) {
-                    Team t = teamRepository.findById(tid).orElseThrow(() -> new BusinessException("Team not found"));
-                    profile.setTeam(t);
-                }
+
+            EmployeeProfilePayload payload = request.getEmployeeProfile();
+            if (payload != null) {
+                payload.applyTo(profile);
             }
-            employeeProfileRepository.save(profile);
+
+            Long teamId = request.resolveTeamId();
+            if (teamId != null) {
+                Team team = teamRepository.findById(teamId).orElseThrow(() -> new BusinessException("Team not found"));
+                profile.setTeam(team);
+            }
+
+            profile = employeeProfileRepository.save(profile);
+            saved.setEmployeeProfile(profile);
+        } else {
+            employeeProfileRepository.findByUserId(saved.getId()).ifPresent(employeeProfileRepository::delete);
         }
 
-        return saved;
+        return UserResponse.from(saved, profile);
     }
 
     @Override
@@ -218,9 +219,14 @@ public class UserServiceImpl implements UserService {
         User user = findById(id);
         Long uid = user.getId();
 
+        if (taskRepository.existsByAssignedTo_IdAndStatusIn(
+                uid, List.of(TaskStatus.TODO, TaskStatus.IN_PROGRESS))) {
+            throw new BusinessException("Cannot delete user because he is assigned to active tasks");
+        }
+
         leaveRequestRepository.clearManagerForUser(uid);
         leaveRequestRepository.deleteByEmployee_Id(uid);
-        notificationRepository.deleteByRecipient_Id(uid);
+        notificationRepository.deleteByRecipientId(uid);
         taskRepository.clearAssignedToForUser(uid);
         taskRepository.clearCreatedByForUser(uid);
 
@@ -233,6 +239,10 @@ public class UserServiceImpl implements UserService {
             projectRepository.save(p);
         }
 
+        evaluationRepository.deleteByEmployee_Id(uid);
+        evaluationRepository.deleteByEvaluator_Id(uid);
+        trainingAttendanceRepository.deleteByUser_Id(uid);
+
         removeStoredFilesForUser(uid);
         employeeDocumentRepository.deleteAll(employeeDocumentRepository.findByUser_IdOrderByUploadDateDesc(uid));
         employeeSkillRepository.deleteByUser_Id(uid);
@@ -240,6 +250,25 @@ public class UserServiceImpl implements UserService {
 
         employeeProfileRepository.findByUserId(uid).ifPresent(employeeProfileRepository::delete);
         userRepository.delete(user);
+    }
+
+    private void sendWelcomeEmailIfHr(User creator, User saved, String rawPassword) {
+        try {
+            if (creator.getRole() != null && creator.getRole().getName() == RoleName.HR) {
+                String subject = "Welcome to the Company";
+                String body = ""
+                        + "Hello,\n\n"
+                        + "Your account has been created successfully.\n\n"
+                        + "Username: " + saved.getUsername() + "\n"
+                        + "Password: " + rawPassword + "\n\n"
+                        + "You can login here:\n"
+                        + "http://localhost:4200/login\n\n"
+                        + "Welcome to the team!\n";
+                emailService.sendEmail(saved.getEmail(), subject, body);
+            }
+        } catch (Exception e) {
+            log.error("Welcome email failed for createdUserId={} createdUserEmail={}", saved.getId(), saved.getEmail(), e);
+        }
     }
 
     private void removeStoredFilesForUser(Long userId) {
@@ -254,46 +283,6 @@ public class UserServiceImpl implements UserService {
             } catch (IOException e) {
                 log.warn("Could not delete file for documentId={} path={}", d.getId(), d.getFilePath(), e);
             }
-        }
-    }
-
-    private Team resolveRequiredTeamForHr(User user) {
-        if (user.getEmployeeProfile() == null
-                || user.getEmployeeProfile().getTeam() == null
-                || user.getEmployeeProfile().getTeam().getId() == null) {
-            throw new BusinessException("Team selection is required when HR creates a user");
-        }
-        Long teamId = user.getEmployeeProfile().getTeam().getId();
-        return teamRepository.findById(teamId).orElseThrow(() -> new BusinessException("Team not found"));
-    }
-
-    private void copyProfileFieldsFromRequest(EmployeeProfile target, EmployeeProfile source) {
-        if (source == null) {
-            return;
-        }
-        if (source.getPhone() != null) {
-            target.setPhone(source.getPhone());
-        }
-        if (source.getAddress() != null) {
-            target.setAddress(source.getAddress());
-        }
-        if (source.getSpeciality() != null) {
-            target.setSpeciality(source.getSpeciality());
-        }
-        if (source.getHireDate() != null) {
-            target.setHireDate(source.getHireDate());
-        }
-        if (source.getExperienceLevel() != null) {
-            target.setExperienceLevel(source.getExperienceLevel());
-        }
-        if (source.getJobTitle() != null) {
-            target.setJobTitle(source.getJobTitle());
-        }
-        if (source.getRemainingLeaveDays() != null) {
-            target.setRemainingLeaveDays(source.getRemainingLeaveDays());
-        }
-        if (source.getSalary() != null) {
-            target.setSalary(source.getSalary());
         }
     }
 }

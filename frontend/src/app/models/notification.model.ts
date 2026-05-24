@@ -1,6 +1,7 @@
 import type { User } from './user.model';
 
 export type NotificationType =
+  | 'INFO'
   | 'TASK_ASSIGNED'
   | 'TASK_COMPLETED'
   | 'TASK_VALIDATED'

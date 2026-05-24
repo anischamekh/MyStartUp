@@ -55,7 +55,7 @@
         <tr>
           <td>{{ u.fullName }}</td>
           <td><p-tag [value]="u.role.name" severity="info" /></td>
-          <td>{{ u.employeeProfile?.team?.name ?? '—' }}</td>
+          <td>{{ u.employeeProfile?.team?.name ?? u.teamName ?? '—' }}</td>
           <td>{{ u.employeeProfile?.speciality ?? '—' }}</td>
           <td>{{ u.email }}</td>
           @if (!auth.viewOnlyAdmin()) {
@@ -153,8 +153,21 @@
       />
     </div>
     <div>
+      <label class="field-label" for="emp-job">Job title</label>
+      <input id="emp-job" pInputText class="w-full" [(ngModel)]="form.employeeProfile!.jobTitle" />
+    </div>
+    <div>
       <label class="field-label" for="emp-phone">Phone</label>
       <input id="emp-phone" pInputText class="w-full" [(ngModel)]="form.employeeProfile!.phone" />
+    </div>
+    <div>
+      <label class="field-label" for="emp-leave">Remaining leave days</label>
+      <p-inputNumber
+        inputId="emp-leave"
+        [(ngModel)]="form.employeeProfile!.remainingLeaveDays"
+        [min]="0"
+        [style]="{ width: '100%' }"
+      />
     </div>
     <div class="span-2">
       <label class="field-label" for="emp-addr">Address</label>

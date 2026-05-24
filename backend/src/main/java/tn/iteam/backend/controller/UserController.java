@@ -2,6 +2,7 @@ package tn.iteam.backend.controller;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tn.iteam.backend.dto.CreateUserRequest;
+import tn.iteam.backend.dto.UpdateUserRequest;
+import tn.iteam.backend.dto.UserResponse;
 import tn.iteam.backend.entity.EmployeeProfile;
 import tn.iteam.backend.entity.RoleName;
 import tn.iteam.backend.entity.Team;
@@ -80,19 +84,18 @@ public class UserController {
     }
 
     @PostMapping
-    public User create(@RequestBody User user) {
-        return userService.create(user);
+    public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
+        return userService.create(request);
     }
 
     @PutMapping("/{id}")
-    public User update(@PathVariable Long id, @RequestBody User user) {
-        return userService.update(id, user);
+    public UserResponse update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
+        return userService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         userService.delete(id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }
-

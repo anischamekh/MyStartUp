@@ -17,6 +17,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 
 import { AuthService } from '../../services/auth.service';
 import type { RoleName } from '../../models/role-name.model';
+import type { CreateUserRequest, UpdateUserRequest } from '../../models/user-request.model';
 import type { EmployeeProfile, ExperienceLevel, Speciality, User } from '../../models/user.model';
 import type { Team } from '../../models/team.model';
 import { UserService } from '../../services/user.service';
@@ -176,7 +177,7 @@ export class EmployeesComponent implements OnInit {
       fullName: '',
       email: '',
       role: { name: 'EMPLOYEE' },
-      employeeProfile: {}
+      employeeProfile: { remainingLeaveDays: 30 }
     };
     this.selectedRole = 'EMPLOYEE';
     this.selectedSpeciality = 'FRONTEND';
@@ -196,25 +197,16 @@ export class EmployeesComponent implements OnInit {
     this.selectedRole = (u.role?.name ?? 'EMPLOYEE') as RoleName;
     this.selectedSpeciality = (u.employeeProfile?.speciality as Speciality) ?? 'FRONTEND';
     this.selectedExperience = (u.employeeProfile?.experienceLevel as ExperienceLevel) ?? 'MID';
-    this.selectedTeamId = u.employeeProfile?.team?.id ?? null;
+    this.selectedTeamId = u.teamId ?? u.employeeProfile?.team?.id ?? null;
     this.hireDateModel = parseYmd(u.employeeProfile?.hireDate ?? undefined);
     this.editModalOpen = true;
   }
 
   submit(): void {
-    this.form.role = { name: this.selectedRole };
     if (this.selectedRole !== 'ADMIN' && this.selectedTeamId == null) {
-      this.notify.show('warn', 'Team is required.');
+      this.notify.show('warn', 'Please select a team.');
       return;
     }
-
-    this.form.employeeProfile = {
-      ...(this.form.employeeProfile ?? {}),
-      speciality: this.selectedSpeciality,
-      experienceLevel: this.selectedExperience,
-      hireDate: toYmd(this.hireDateModel) || undefined,
-      team: this.selectedTeamId != null ? { id: this.selectedTeamId } : undefined
-    };
 
     const email = this.form.email?.trim() ?? '';
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -231,23 +223,57 @@ export class EmployeesComponent implements OnInit {
       return;
     }
 
-    const { roleName: _roleName, teamName: _teamName, ...userPayload } = this.form as User & {
-      teamName?: string;
+    const profile: EmployeeProfile = {
+      phone: this.form.employeeProfile?.phone?.trim() || undefined,
+      address: this.form.employeeProfile?.address?.trim() || undefined,
+      jobTitle: this.form.employeeProfile?.jobTitle?.trim() || undefined,
+      speciality: this.selectedSpeciality,
+      experienceLevel: this.selectedExperience,
+      hireDate: toYmd(this.hireDateModel) || undefined,
+      salary: this.form.employeeProfile?.salary,
+      remainingLeaveDays: this.form.employeeProfile?.remainingLeaveDays
     };
-    const req = this.editingId
-      ? this.api.update(this.editingId, userPayload)
-      : this.api.create(userPayload);
 
-    req.subscribe({
-      next: () => {
-        this.closeEditModal();
-        this.reload();
-        this.notify.show('success', this.editingId ? 'Employee updated.' : 'User created and email sent.');
-      },
-      error: (err) => {
-        this.notify.show('error', apiErrorMessage(err, 'Could not save employee.'));
+    const teamId = this.selectedRole !== 'ADMIN' ? this.selectedTeamId : null;
+
+    if (this.editingId) {
+      const updatePayload: UpdateUserRequest = {
+        username: this.form.username.trim(),
+        fullName: this.form.fullName.trim(),
+        email,
+        role: this.selectedRole,
+        teamId,
+        employeeProfile: profile
+      };
+      const pwd = this.form.password?.trim();
+      if (pwd) {
+        updatePayload.password = pwd;
       }
-    });
+      this.api.update(this.editingId, updatePayload).subscribe({
+        next: () => this.onSaveSuccess(true),
+        error: (err) => this.notify.show('error', apiErrorMessage(err, 'Could not save employee.'))
+      });
+    } else {
+      const createPayload: CreateUserRequest = {
+        username: this.form.username.trim(),
+        password: this.form.password!.trim(),
+        fullName: this.form.fullName.trim(),
+        email,
+        role: this.selectedRole,
+        teamId,
+        employeeProfile: profile
+      };
+      this.api.create(createPayload).subscribe({
+        next: () => this.onSaveSuccess(false),
+        error: (err) => this.notify.show('error', apiErrorMessage(err, 'Could not save employee.'))
+      });
+    }
+  }
+
+  private onSaveSuccess(isEdit: boolean): void {
+    this.closeEditModal();
+    this.reload();
+    this.notify.show('success', isEdit ? 'Employee updated.' : 'User created successfully.');
   }
 
   confirmRemove(u: User): void {

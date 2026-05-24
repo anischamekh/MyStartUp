@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { ApiService } from './api.service';
+import type { CreateUserRequest, UpdateUserRequest, UserResponse } from '../models/user-request.model';
 import type { User } from '../models/user.model';
 
 @Injectable({ providedIn: 'root' })
@@ -19,16 +20,15 @@ export class UserService {
     return this.api.client.get<User>(`${this.api.baseUrl}/users/me`);
   }
 
-  create(user: User) {
-    return this.api.client.post<User>(`${this.api.baseUrl}/users`, user);
+  create(request: CreateUserRequest) {
+    return this.api.client.post<UserResponse>(`${this.api.baseUrl}/users`, request);
   }
 
-  update(id: number, user: User) {
-    return this.api.client.put<User>(`${this.api.baseUrl}/users/${id}`, user);
+  update(id: number, request: UpdateUserRequest) {
+    return this.api.client.put<UserResponse>(`${this.api.baseUrl}/users/${id}`, request);
   }
 
   delete(id: number) {
     return this.api.client.delete(`${this.api.baseUrl}/users/${id}`);
   }
 }
-
