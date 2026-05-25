@@ -5,6 +5,7 @@ import type { RoleName } from '../models/role-name.model';
 
 export interface LoginResponse {
   token: string;
+  refreshToken?: string;
   userId: number;
   username: string;
   fullName: string;
@@ -41,7 +42,23 @@ export class AuthService {
 
   login(username: string, password: string) {
     return this.api.client
-      .post<LoginResponse>(`${this.api.baseUrl}/auth/login`, { username, password })
+      .post<LoginResponse>(`${this.api.baseUrl}/auth/login`, { username, password }, { withCredentials: true })
+      .pipe(
+        tap((resp) => {
+          localStorage.setItem('auth', JSON.stringify(resp));
+          this._auth$.next(resp);
+        })
+      );
+  }
+
+  refreshSession() {
+    const refreshToken = this._auth$.value?.refreshToken;
+    return this.api.client
+      .post<LoginResponse>(
+        `${this.api.baseUrl}/auth/refresh`,
+        refreshToken ? { refreshToken } : {},
+        { withCredentials: true }
+      )
       .pipe(
         tap((resp) => {
           localStorage.setItem('auth', JSON.stringify(resp));

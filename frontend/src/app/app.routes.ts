@@ -15,7 +15,6 @@ import { ReportsComponent } from './components/reports/reports.component';
 import { SkillsTrainingComponent } from './components/skills-training/skills-training.component';
 import { EvaluationsComponent } from './components/evaluations/evaluations.component';
 import { LeaveCalendarComponent } from './components/leave-calendar/leave-calendar.component';
-
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
 

@@ -11,11 +11,20 @@ import { LayoutService } from '../../services/layout.service';
 import { ThemeService } from '../../services/theme.service';
 import { NotificationBadgeService } from '../../services/notification-badge.service';
 import type { RoleName } from '../../models/role-name.model';
+import { ChatbotWidgetComponent } from '../chatbot-widget/chatbot-widget.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, ButtonModule, ToastModule],
+  imports: [
+    CommonModule,
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    ButtonModule,
+    ToastModule,
+    ChatbotWidgetComponent
+  ],
   templateUrl: './main-layout.component.html',
   styleUrl: './main-layout.component.css'
 })
